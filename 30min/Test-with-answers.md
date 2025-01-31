@@ -3,32 +3,136 @@
 ```java
 System.out.println("Test" == "Test");                               // 1
 System.out.println("Test".equals("Test"));                          // 2
-System.out.println("Test" == new String("Test"));                   // 3
-System.out.println("Test".equals(new String("Test")));              // 4
-System.out.println("TestTest" == ("Test" + "Test"));                // 5
+        System.out.println("Test" == new String("Test"));                   // 3
+        System.out.println("Test".equals(new String("Test")));              // 4
+        System.out.println("TestTest" == ("Test" + "Test"));                // 5
 String a = "Test"; System.out.println("TestTest" == (a + "Test"));  // 6
 ```
-* *1*  → true 
+* *1*  → true
   * Both "Test" are string literals, which are **interned** in the **String Pool**. they refer to the **same object**
-* *2* → true 
+* *2* → true
   * `.equals()` compares **content**, and both strings are identical. `"Test".equals("Test")` compares values.
-* *3* → false 
-  * `new String("Test")` **creates a new object** in the **heap**, not in the **String Pool**. 
+* *3* → false
+  * `new String("Test")` **creates a new object** in the **heap**, not in the **String Pool**.
   * `==` checks for **reference equality**, and these are **two different objects**, so it returns `false`.
-* *4* → true 
+* *4* → true
   * `.equals()` compares **content**, not references. The values are identical.
-* *5* → true 
-  * `"Test" + "Test"` is a **compile-time constant** because both operands are **string literals**. 
-  * The Java compiler **optimizes this to `"TestTest"` at compile time**. 
-  * Since `"TestTest"` is **interned** in the **String Pool**, both references point to the **same object**. 
-* *6* → false 
-  * `a` is a **variable**, not a **string literal**. Java **cannot optimize `"Test" + a"` at compile time**. 
-  * Instead, Java **creates a new `String` object** in the **heap** at runtime. 
+* *5* → true
+  * `"Test" + "Test"` is a **compile-time constant** because both operands are **string literals**.
+  * The Java compiler **optimizes this to `"TestTest"` at compile time**.
+  * Since `"TestTest"` is **interned** in the **String Pool**, both references point to the **same object**.
+* *6* → false
+  * `a` is a **variable**, not a **string literal**. Java **cannot optimize `"Test" + a"` at compile time**.
+  * Instead, Java **creates a new `String` object** in the **heap** at runtime.
   * The result is a **different object** than the interned `"TestTest"`, so `==` returns `false`.
 
 ### **Follow-up Questions:**
+- String literal vs object
+  * String literal: Automatically interned at class load. Points to the same thing in the pool.
+  * String object (via new): Always a new thing on the heap. Not interned unless .intern() is called.
+- Is String Object ever automatically interned?
+  * Nah, requires explicit .intern()
 - What happens if we use .intern() on new String("Test") before comparison? (System.out.println("Test" == new String("Test").intern());)
 - How does string interning improve memory efficiency?
+  * Merges duplicates into one shared thing (pool). All references point to the same interned instance.
+
+## ** Equals vs Hash Code
+
+```java
+@AllArgsConstructor
+abstract class AbstractPerson {
+  public final String name;
+  public int id;
+}
+
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+class Person extends AbstractPerson { }
+
+@AllArgsConstructor
+class PersonWithoutEquals extends AbstractPerson {
+  @Override
+  public int hashCode() { return id; }
+}
+
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+class PersonWithoutHashCode extends AbstractPerson {
+  @Override
+  public int hashCode() {
+    return System.identityHashCode(this); // Uses default 
+  }
+}
+
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+class PersonMutable extends AbstractPerson {
+  @Override
+  public int hashCode() { return id; }
+}
+
+public class PersonTest {
+  public static void main(String[] args) {
+      
+    Person p1 = new Person("Alice", 1);
+    Person p2 = new Person("Alice", 1);
+    Person p3 = new Person("Bob", 2);
+    Person p4 = new Person("Charlie", 3);
+    Person p5 = new Person("AL1ce", 1);
+
+    System.out.println("=== EQUALS AND HASHCODE CONTRACT TESTS ===");
+
+    System.out.println(p1.equals(p2));
+    System.out.println(p1.hashCode() == p2.hashCode());
+
+    System.out.println(p1.equals(p3));
+    System.out.println(p1.hashCode() == p3.hashCode());
+
+    System.out.println(p1.hashCode() == p5.hashCode());
+    System.out.println(p1.equals(p5));
+
+    PersonWithoutEquals pe1 = new PersonWithoutEquals("Alice", 1);
+    PersonWithoutEquals pe2 = new PersonWithoutEquals("Alice", 1);
+    
+    System.out.println(pe1.equals(pe2));
+    System.out.println(pe1.hashCode() == pe2.hashCode());
+
+    // HashSet #1
+    PersonWithoutHashCode ph1 = new PersonWithoutHashCode("Alice", 1);
+    PersonWithoutHashCode ph2 = new PersonWithoutHashCode("Alice", 1);
+
+    Set<PersonWithoutHashCode> hashSet = new HashSet<>();
+    hashSet.add(ph1);
+    hashSet.add(ph2);
+    
+    System.out.println(hashSet.size());
+
+    // HashSet #2
+    PersonMutable pm = new PersonMutable("Eve", 4);
+    Set<PersonMutable> mutableSet = new HashSet<>();
+    
+    mutableSet.add(pm);
+    
+    System.out.println(mutableSet.contains(pm));
+
+    pm.id = 5;
+    
+    System.out.println(mutableSet.contains(pm));
+    System.out.println(mutableSet.size());
+
+    // HashMap
+    Map<Person, Integer> map = new HashMap<>();
+    map.put(p1, 100);
+    map.put(p2, 200);
+    map.put(p3, 300);
+
+    System.out.println(map.get(p1));
+    System.out.println(map.get(p2));
+    System.out.println(map.get(p3));
+  }
+}
+```
+
 
 ## How does Java achieve memory management? What are the key components of Java's memory model?
 Java relies on automatic **garbage collection (GC)** to manage memory. The key components:
@@ -41,8 +145,6 @@ Java relies on automatic **garbage collection (GC)** to manage memory. The key c
 - How does the GC know when to remove an object? (Strong vs Weak references) (Default type of reference in Java, as long a strong reference exists... local
   vars, class fields etc)
 - When would a memory leak occur in Java?
-
-<div style="page-break-after: always;"></div>
 
 # Part Two - Coding Problems [15min]
 
@@ -58,25 +160,25 @@ Output: `"Java is this world Hello"`
 #### Streams one-liner
 ```java
 public static String reverseWords(String sentence) {
-    return Arrays.stream(sentence.split(" "))
-        .collect(Collectors.collectingAndThen(Collectors.toList(), list -> {
+  return Arrays.stream(sentence.split(" "))
+          .collect(Collectors.collectingAndThen(Collectors.toList(), list -> {
             Collections.reverse(list);
             return String.join(" ", list);
-        }));
+          }));
 }
 ```
 
 #### Manual Swap no Collection reverse, No Collections API
 ```java
 public static String reverseWords(String sentence) {
-    String[] words = sentence.split(" ");
-    int left = 0, right = words.length - 1;
-    while (left < right) {
-        String temp = words[left];
-        words[left++] = words[right];
-        words[right--] = temp;
-    }
-    return String.join(" ", words);
+  String[] words = sentence.split(" ");
+  int left = 0, right = words.length - 1;
+  while (left < right) {
+    String temp = words[left];
+    words[left++] = words[right];
+    words[right--] = temp;
+  }
+  return String.join(" ", words);
 }
 ```
 
@@ -93,18 +195,18 @@ Output: `2`
 ### Example using HashMap
 ```java
 public static int mostFrequent(int[] nums) {
-    Map<Integer, Integer> freq = new HashMap<>();
-    int maxCount = 0, result = nums[0];
+  Map<Integer, Integer> freq = new HashMap<>();
+  int maxCount = 0, result = nums[0];
 
-    for (int num : nums) {
-        int count = freq.getOrDefault(num, 0) + 1;
-        freq.put(num, count);
-        if (count > maxCount) {
-            maxCount = count;
-            result = num;
-        }
+  for (int num : nums) {
+    int count = freq.getOrDefault(num, 0) + 1;
+    freq.put(num, count);
+    if (count > maxCount) {
+      maxCount = count;
+      result = num;
     }
-    return result;
+  }
+  return result;
 }
 ```
 
@@ -117,9 +219,9 @@ public static int mostFrequent(int[] nums) {
   application code**.
 - **Dependency Injection (DI):** One way to implement IoC where dependencies are **injected rather than created manually**.
 - Spring supports:
-    - **Constructor Injection** (preferred, immutable dependencies).
-    - **Setter Injection** (mutable dependencies).
-    - **Field Injection** (discouraged due to poor testability).
+  - **Constructor Injection** (preferred, immutable dependencies).
+  - **Setter Injection** (mutable dependencies).
+  - **Field Injection** (discouraged due to poor testability).
 - Spring manages beans through **ApplicationContext** and annotations (`@Component`, `@Service`, `@Repository`).
 
 👉 **Follow-up Questions:**
@@ -132,9 +234,9 @@ public static int mostFrequent(int[] nums) {
 ✅ **Expected Answer:**
 - Auto-configuration **removes the need for manual bean definitions** by detecting dependencies on the classpath.
 - `@SpringBootApplication` enables:
-    - **Component scanning** (`@ComponentScan`).
-    - **Configuration** (`@Configuration`).
-    - **Auto-configuration** (`@EnableAutoConfiguration`).
+  - **Component scanning** (`@ComponentScan`).
+  - **Configuration** (`@Configuration`).
+  - **Auto-configuration** (`@EnableAutoConfiguration`).
 - Uses **Spring Boot Starters** to pre-configure commonly used beans.
 - `META-INF/spring.factories` specifies auto-configurations.
 
@@ -199,13 +301,13 @@ public static int mostFrequent(int[] nums) {
 ✅ **Expected Answer:**
 
 - **Producer Level:**
-    - **Enable idempotence** (`enable.idempotence=true`).
-    - Use **Kafka Transactions** to write atomically across multiple topics.
+  - **Enable idempotence** (`enable.idempotence=true`).
+  - Use **Kafka Transactions** to write atomically across multiple topics.
 - **Consumer Level:**
-    - **Read-Process-Commit Pattern:** Consume, process, and only commit if successful.
-    - **Use External Idempotency Keys** (e.g., Store processed event IDs in Redis or DB).
+  - **Read-Process-Commit Pattern:** Consume, process, and only commit if successful.
+  - **Use External Idempotency Keys** (e.g., Store processed event IDs in Redis or DB).
 - **Offset Management:**
-    - Use **manual commits** (`commitSync()` or `commitAsync()`) instead of auto-commit.
+  - Use **manual commits** (`commitSync()` or `commitAsync()`) instead of auto-commit.
 
 👉 **Follow-up Questions:**
 
